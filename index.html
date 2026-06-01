@@ -4,295 +4,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EMV TLV ‘⁄œﬂΩ‚Œˆπ§æﬂ</title>
+    <title>EMV TLV Êô∫ËÉΩËß£ÊûêÂô® | Pro Decoder</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-        
         body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            min-height: 100vh;
+            background-color: #f8fafc;
         }
-        
-        .mono-font {
-            font-family: 'JetBrains Mono', monospace;
-        }
-        
-        .glass-effect {
-            background: rgba(255, 255, 255, 0.05);
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        
-        .tlv-tag {
-            color: #60a5fa;
-            font-weight: 600;
+        .tlv-tree-line {
+            position: absolute;
+            left: 14px;
+            top: 24px;
+            bottom: 0;
+            width: 1px;
+            background-color: #e2e8f0;
         }
-        
-        .tlv-length {
-            color: #fbbf24;
-            font-weight: 500;
-        }
-        
-        .tlv-value {
-            color: #34d399;
-        }
-        
-        .tlv-value-ascii {
-            color: #a78bfa;
-        }
-        
-        .hover-row:hover {
-            background-color: rgba(255, 255, 255, 0.05);
-            transition: all 0.2s ease;
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar {
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
         }
-        
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
             border-radius: 4px;
         }
-        
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
         }
-        
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-        
-        .animate-fade-in {
+        .fade-in {
             animation: fadeIn 0.3s ease-in-out;
         }
-        
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            transition: all 0.3s ease;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4);
-        }
-        
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.1);
-            transition: all 0.3s ease;
-        }
-        
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.15);
-            transform: translateY(-2px);
-        }
     </style>
 </head>
-<body class="text-gray-100">
-    <!-- Header -->
-    <header class="glass-effect sticky top-0 z-50 border-b border-gray-700">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-microchip text-white text-lg"></i>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <div class="bg-brand-600 text-white p-2 rounded-lg shadow-lg shadow-brand-500/30">
+                        <i class="fa-solid fa-microchip text-xl"></i>
                     </div>
-                    <div>
-                        <h1 class="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                            EMV TLV Parser
-                        </h1>
-                        <p class="text-xs text-gray-400">◊®“µº∂÷«ƒ‹ø® ˝æ›Ω‚Œˆπ§æﬂ</p>
-                    </div>
+                    <span class="font-bold text-xl tracking-tight text-slate-900">EMV<span class="text-brand-600">Decoder</span></span>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <button onclick="loadExample()" class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium">
-                        <i class="fas fa-lightbulb mr-2"></i>º”‘ÿ æ¿˝
+                <div class="flex items-center gap-4">
+                    <button onclick="app.clearAll()" class="text-sm text-slate-500 hover:text-red-500 transition-colors font-medium">
+                        <i class="fa-solid fa-trash-can mr-1"></i> Ê∏ÖÁ©∫
                     </button>
-                    <button onclick="clearAll()" class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium">
-                        <i class="fas fa-trash mr-2"></i>«Âø’
-                    </button>
+                    <a href="https://github.com" target="_blank" class="text-slate-400 hover:text-slate-600 transition-colors">
+                        <i class="fa-brands fa-github text-xl"></i>
+                    </a>
                 </div>
             </div>
         </div>
-    </header>
+    </nav>
 
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
-            <!-- Input Section -->
-            <div class="space-y-6">
+            <!-- Left Column: Input & Controls -->
+            <div class="lg:col-span-5 space-y-6">
+                
                 <!-- Input Card -->
-                <div class="glass-effect rounded-xl p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-semibold flex items-center">
-                            <i class="fas fa-keyboard text-blue-400 mr-2"></i>
-                             ‰»Î ˝æ›
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-keyboard text-brand-500"></i> Êï∞ÊçÆËæìÂÖ•
                         </h2>
-                        <div class="flex space-x-2">
-                            <button onclick="setInputFormat('hex')" id="btn-hex" class="px-3 py-1 rounded text-xs font-medium bg-blue-600 text-white">
-                                HEX
-                            </button>
-                            <button onclick="setInputFormat('base64')" id="btn-base64" class="px-3 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300">
-                                Base64
-                            </button>
-                        </div>
+                        <span class="text-xs font-mono bg-slate-200 text-slate-600 px-2 py-1 rounded">HEX String</span>
                     </div>
-                    
-                    <textarea 
-                        id="tlv-input" 
-                        class="w-full h-64 bg-gray-900/50 border border-gray-700 rounded-lg p-4 mono-font text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none custom-scrollbar"
-                        placeholder="‘⁄¥À’≥Ã˘ HEX ªÚ Base64 ±‡¬Îµƒ TLV  ˝æ›...&#10;&#10; æ¿˝ HEX:&#10;9F0206000000001000&#10;9F0306000000000000&#10;9F1A020156"
-                    ></textarea>
-                    
-                    <div class="mt-4 flex items-center justify-between">
-                        <div class="flex items-center space-x-4">
-                            <label class="flex items-center space-x-2 cursor-pointer">
-                                <input type="checkbox" id="auto-parse" checked class="w-4 h-4 rounded border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-700">
-                                <span class="text-sm text-gray-400">◊‘∂ØΩ‚Œˆ</span>
-                            </label>
-                            <label class="flex items-center space-x-2 cursor-pointer">
-                                <input type="checkbox" id="show-ascii" checked class="w-4 h-4 rounded border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-700">
-                                <span class="text-sm text-gray-400">œ‘ æ ASCII</span>
-                            </label>
+                    <div class="p-5">
+                        <div class="relative">
+                            <textarea id="hexInput" 
+                                class="w-full h-48 p-4 font-mono text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all resize-none text-slate-700 placeholder-slate-400"
+                                placeholder="Âú®Ê≠§Á≤òË¥¥ HEX Êï∞ÊçÆ (‰æãÂ¶Ç: 9F0206000000001000...)"
+                                spellcheck="false"></textarea>
+                            <div class="absolute bottom-3 right-3 flex gap-2">
+                                <button onclick="app.formatInput()" class="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all" title="Ê†ºÂºèÂåñËæìÂÖ•">
+                                    <i class="fa-solid fa-align-left"></i>
+                                </button>
+                                <button onclick="app.pasteFromClipboard()" class="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all" title="‰ªéÂâ™Ë¥¥ÊùøÁ≤òË¥¥">
+                                    <i class="fa-regular fa-clipboard"></i>
+                                </button>
+                            </div>
                         </div>
-                        <button onclick="parseTLV()" class="btn-primary px-6 py-2 rounded-lg font-medium text-white">
-                            <i class="fas fa-play mr-2"></i>Ω‚Œˆ
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Quick Info Card -->
-                <div class="glass-effect rounded-xl p-6">
-                    <h3 class="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">øÏÀŸ–≈œ¢</h3>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="bg-gray-900/30 rounded-lg p-3">
-                            <div class="text-xs text-gray-500 mb-1"> ˝æ›≥§∂»</div>
-                            <div id="info-length" class="text-lg font-mono font-semibold text-blue-400">0 bytes</div>
-                        </div>
-                        <div class="bg-gray-900/30 rounded-lg p-3">
-                            <div class="text-xs text-gray-500 mb-1">TLV ‘™Àÿ ˝</div>
-                            <div id="info-count" class="text-lg font-mono font-semibold text-green-400">0</div>
-                        </div>
-                        <div class="bg-gray-900/30 rounded-lg p-3">
-                            <div class="text-xs text-gray-500 mb-1">Ω‚Œˆ◊¥Ã¨</div>
-                            <div id="info-status" class="text-sm font-medium text-gray-400">µ»¥˝ ‰»Î</div>
-                        </div>
-                        <div class="bg-gray-900/30 rounded-lg p-3">
-                            <div class="text-xs text-gray-500 mb-1">∏Ò Ω</div>
-                            <div id="info-format" class="text-sm font-medium text-gray-400">HEX</div>
+                        
+                        <div class="mt-4 flex gap-3">
+                            <button onclick="app.parse()" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 px-4 rounded-xl shadow-lg shadow-brand-500/30 transition-all active:scale-95 flex justify-center items-center gap-2">
+                                <i class="fa-solid fa-bolt"></i> Á´ãÂç≥Ëß£Êûê
+                            </button>
+                            <button onclick="app.loadSample()" class="px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-all">
+                                Á§∫‰æã
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- EMV Tag Reference -->
-                <div class="glass-effect rounded-xl p-6">
-                    <h3 class="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">≥£”√ EMV ±Í«©≤Œøº</h3>
-                    <div class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('9F02')">
-                            <span class="mono-font text-blue-400 text-sm">9F02</span>
-                            <span class="text-xs text-gray-400"> ⁄»®Ω∂Ó (Amount, Authorized)</span>
-                        </div>
-                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('9F03')">
-                            <span class="mono-font text-blue-400 text-sm">9F03</span>
-                            <span class="text-xs text-gray-400">∆‰À˚Ω∂Ó (Amount, Other)</span>
-                        </div>
-                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('9F1A')">
-                            <span class="mono-font text-blue-400 text-sm">9F1A</span>
-                            <span class="text-xs text-gray-400">π˙º“¥˙¬Î (Country Code)</span>
-                        </div>
-                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('5F2A')">
-                            <span class="mono-font text-blue-400 text-sm">5F2A</span>
-                            <span class="text-xs text-gray-400">Ωª“◊ªı±“¥˙¬Î (Transaction Currency Code)</span>
-                        </div>
-                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('9A')">
-                            <span class="mono-font text-blue-400 text-sm">9A</span>
-                            <span class="text-xs text-gray-400">Ωª“◊»’∆⁄ (Transaction Date)</span>
-                        </div>
-                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('9C')">
-                            <span class="mono-font text-blue-400 text-sm">9C</span>
-                            <span class="text-xs text-gray-400">Ωª“◊¿‡–Õ (Transaction Type)</span>
-                        </div>
-                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('5F34')">
-                            <span class="mono-font text-blue-400 text-sm">5F34</span>
-                            <span class="text-xs text-gray-400">”¶”√ PAN –Ú¡–∫≈ (Application PAN Sequence Number)</span>
-                        </div>
-                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('9F33')">
-                            <span class="mono-font text-blue-400 text-sm">9F33</span>
-                            <span class="text-xs text-gray-400">÷’∂Àƒ‹¡¶ (Terminal Capabilities)</span>
-                        </div>
+                <!-- History Card -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left text-brand-500"></i> Ëß£ÊûêÂéÜÂè≤
+                        </h2>
+                        <button onclick="app.clearHistory()" class="text-xs text-slate-400 hover:text-red-500">Ê∏ÖÈô§ÂéÜÂè≤</button>
+                    </div>
+                    <div class="p-0">
+                        <ul id="historyList" class="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                            <!-- History items will be injected here -->
+                            <li class="p-4 text-center text-slate-400 text-sm italic">ÊöÇÊó†ÂéÜÂè≤ËÆ∞ÂΩï</li>
+                        </ul>
                     </div>
                 </div>
+
             </div>
 
-            <!-- Output Section -->
-            <div class="space-y-6">
-                <!-- Parsed Result Card -->
-                <div class="glass-effect rounded-xl p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-semibold flex items-center">
-                            <i class="fas fa-code-branch text-green-400 mr-2"></i>
-                            Ω‚ŒˆΩ·π˚
+            <!-- Right Column: Output & Visualization -->
+            <div class="lg:col-span-7 space-y-6">
+                
+                <!-- Stats Bar -->
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center">
+                        <span class="text-xs text-slate-500 uppercase font-bold tracking-wider">Tags Found</span>
+                        <span id="statTags" class="text-2xl font-bold text-brand-600 mt-1">0</span>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center">
+                        <span class="text-xs text-slate-500 uppercase font-bold tracking-wider">Data Length</span>
+                        <span id="statLength" class="text-2xl font-bold text-indigo-600 mt-1">0 B</span>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center">
+                        <span class="text-xs text-slate-500 uppercase font-bold tracking-wider">Status</span>
+                        <span id="statStatus" class="text-sm font-bold text-emerald-600 mt-1 bg-emerald-50 px-2 py-1 rounded-full">Ready</span>
+                    </div>
+                </div>
+
+                <!-- Result Tree -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px] flex flex-col">
+                    <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-tree text-brand-500"></i> ÁªìÊûÑÂåñËßÜÂõæ
                         </h2>
-                        <div class="flex space-x-2">
-                            <button onclick="exportJSON()" class="px-3 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 transition">
-                                <i class="fas fa-file-code mr-1"></i>JSON
+                        <div class="flex gap-2">
+                            <button onclick="app.exportJSON()" class="text-xs bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                                <i class="fa-solid fa-file-code"></i> JSON
                             </button>
-                            <button onclick="copyResult()" class="px-3 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 transition">
-                                <i class="fas fa-copy mr-1"></i>∏¥÷∆
+                            <button onclick="app.copyResult()" class="text-xs bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                                <i class="fa-regular fa-copy"></i> Â§çÂà∂
                             </button>
                         </div>
                     </div>
                     
-                    <div id="parsed-output" class="bg-gray-900/50 rounded-lg p-4 min-h-[400px] max-h-[600px] overflow-y-auto custom-scrollbar">
-                        <div class="text-center text-gray-500 py-20">
-                            <i class="fas fa-inbox text-4xl mb-4 opacity-50"></i>
-                            <p>«Î ‰»Î TLV  ˝æ›≤¢µ„ª˜Ω‚Œˆ</p>
+                    <div class="p-6 overflow-x-auto flex-grow bg-slate-50/30 relative">
+                        <div id="resultContainer" class="font-mono text-sm">
+                            <div class="flex flex-col items-center justify-center h-64 text-slate-400">
+                                <i class="fa-solid fa-layer-group text-4xl mb-3 opacity-20"></i>
+                                <p>Á≠âÂæÖÊï∞ÊçÆËæìÂÖ•...</p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Hex View Card -->
-                <div class="glass-effect rounded-xl p-6">
-                    <h2 class="text-lg font-semibold flex items-center mb-4">
-                        <i class="fas fa-terminal text-purple-400 mr-2"></i>
-                         Æ¡˘Ω¯÷∆ ”Õº
-                    </h2>
-                    <div id="hex-view" class="bg-gray-900/50 rounded-lg p-4 mono-font text-sm overflow-x-auto custom-scrollbar">
-                        <div class="text-center text-gray-500 py-8">
-                            <p>Ω‚Œˆ∫ÛΩ´œ‘ æœÍœ∏µƒ Æ¡˘Ω¯÷∆ ”Õº</p>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </main>
 
     <!-- Footer -->
-    <footer class="border-t border-gray-700 mt-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div class="flex flex-col md:flex-row justify-between items-center">
-                <div class="text-sm text-gray-500">
-                    <i class="fas fa-shield-alt mr-2"></i>
-                    À˘”– ˝æ›¥¶¿Ìæ˘‘⁄±æµÿ‰Ø¿¿∆˜÷–ÕÍ≥…£¨≤ªª·…œ¥´µΩ∑˛ŒÒ∆˜
-                </div>
-                <div class="flex items-center space-x-4 mt-4 md:mt-0">
-                    <span class="text-xs text-gray-600">÷ß≥÷ EMV / ISO 7816 / BER-TLV ∏Ò Ω</span>
-                </div>
+    <footer class="bg-white border-t border-slate-200 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
+            <p class="text-slate-500 text-sm">¬© 2026 EMV Decoder Tool. Local Processing Only.</p>
+            <div class="flex gap-4 text-sm text-slate-500">
+                <span class="flex items-center gap-1"><i class="fa-solid fa-shield-halved text-emerald-500"></i> Privacy Safe</span>
+                <span class="flex items-center gap-1"><i class="fa-solid fa-bolt text-yellow-500"></i> Fast Parse</span>
             </div>
         </div>
     </footer>
 
+    <!-- Application Logic -->
     <script src="app.js"></script>
 </body>
 </html>

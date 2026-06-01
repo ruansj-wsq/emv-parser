@@ -1,648 +1,519 @@
 
-// EMV TLV Parser Application Logic
+/**
+ * EMV TLV Parser Logic
+ * Handles hex parsing, TLV structure traversal, and UI rendering.
+ */
 
-let currentFormat = 'hex';
-let parsedData = [];
+// --- EMV Tag Dictionary (Subset of common tags) ---
+const EMV_TAGS = {
+    "4F": "Application Identifier (AID)",
+    "50": "Application Label",
+    "57": "Track 2 Equivalent Data",
+    "5A": "Application Primary Account Number (PAN)",
+    "5F20": "Cardholder Name",
+    "5F24": "Application Expiration Date",
+    "5F25": "Application Effective Date",
+    "5F2D": "Language Preference",
+    "5F30": "Service Code",
+    "5F34": "Application Primary Account Number Sequence Number",
+    "6F": "File Control Information (FCI) Template",
+    "70": "READ RECORD Response Message Template",
+    "77": "Response Message Template Format 2",
+    "80": "Response Message Template Format 1",
+    "82": "Application Interchange Profile",
+    "83": "Command Template",
+    "84": "Dedicated File (DF) Name",
+    "86": "Issuer Script Command",
+    "87": "Application Priority Indicator",
+    "88": "Short File Identifier (SFI)",
+    "8A": "Authorisation Response Code",
+    "8C": "Card Risk Management Data Object List 1 (CDOL1)",
+    "8D": "Card Risk Management Data Object List 2 (CDOL2)",
+    "8E": "Cardholder Verification Method (CVM) List",
+    "8F": "Certification Authority Public Key Index",
+    "90": "Issuer Public Key Certificate",
+    "91": "Issuer Authentication Data",
+    "92": "Issuer Public Key Remainder",
+    "93": "Signed Static Application Data",
+    "94": "Application File Locator (AFL)",
+    "95": "Terminal Verification Results (TVR)",
+    "97": "Transaction Certificate Data Object List (TDOL)",
+    "98": "Transaction Certificate (TC) Hash Value",
+    "99": "Transaction Personal Identification Number (PIN) Data",
+    "9A": "Transaction Date",
+    "9B": "Transaction Status Information",
+    "9C": "Transaction Type",
+    "9D": "Directory Definition File (DDF) Name",
+    "9F01": "Acquirer Identifier",
+    "9F02": "Amount, Authorised (Numeric)",
+    "9F03": "Amount, Other (Numeric)",
+    "9F04": "Amount, Other (Binary)",
+    "9F05": "Application Discretionary Data",
+    "9F06": "Application Identifier (AID) - Terminal",
+    "9F07": "Application Usage Control",
+    "9F08": "Application Version Number",
+    "9F09": "Application Version Number",
+    "9F0D": "Issuer Action Code - Default",
+    "9F0E": "Issuer Action Code - Denial",
+    "9F0F": "Issuer Action Code - Online",
+    "9F10": "Issuer Application Data",
+    "9F11": "Issuer Code Table Index",
+    "9F12": "Application Preferred Name",
+    "9F13": "Last Online Application Transaction Counter (ATC) Register",
+    "9F14": "Lower Consecutive Offline Limit",
+    "9F15": "Merchant Category Code",
+    "9F16": "Merchant Identifier",
+    "9F17": "Personal Identification Number (PIN) Try Counter",
+    "9F18": "Issuer Script Identifier",
+    "9F1A": "Terminal Country Code",
+    "9F1B": "Terminal Floor Limit",
+    "9F1C": "Terminal Identification",
+    "9F1D": "Terminal Risk Management Data",
+    "9F1E": "Interface Device (IFD) Serial Number",
+    "9F1F": "Track 1 Discretionary Data",
+    "9F20": "Track 2 Discretionary Data",
+    "9F21": "Transaction Time",
+    "9F22": "Certification Authority Public Key Index",
+    "9F23": "Upper Consecutive Offline Limit",
+    "9F26": "Application Cryptogram",
+    "9F27": "Cryptogram Information Data",
+    "9F2D": "Integrated Circuit Card (ICC) PIN Encipherment Public Key Exponent",
+    "9F2E": "Integrated Circuit Card (ICC) PIN Encipherment Public Key Remainder",
+    "9F2F": "Integrated Circuit Card (ICC) PIN Encipherment Public Key Certificate",
+    "9F32": "Issuer Public Key Exponent",
+    "9F33": "Terminal Capabilities",
+    "9F34": "Cardholder Verification Method (CVM) Results",
+    "9F35": "Terminal Type",
+    "9F36": "Application Transaction Counter (ATC)",
+    "9F37": "Unpredictable Number",
+    "9F38": "Processing Options Data Object List (PDOL)",
+    "9F39": "Point-of-Service (POS) Entry Mode",
+    "9F40": "Additional Terminal Capabilities",
+    "9F41": "Transaction Sequence Counter",
+    "9F42": "Application Currency Code",
+    "9F43": "Application Reference Currency",
+    "9F44": "Application Currency Exponent",
+    "9F45": "Data Authentication Code",
+    "9F46": "Static Data Authentication Tag List",
+    "9F47": "Signed Dynamic Application Data",
+    "9F48": "Dynamic Data Authentication Tag List",
+    "9F49": "Dynamic Data Object List (DDOL)",
+    "9F4A": "Static Data Authentication Tag List",
+    "9F4B": "Signed Dynamic Application Data",
+    "9F4C": "ICC Dynamic Number",
+    "9F4D": "Log Entry",
+    "9F4E": "Merchant Name and Location",
+    "9F4F": "Log Format",
+    "9F53": "Consecutive Transaction Limit (International - Country)",
+    "9F54": "Cumulative Total Transaction Amount Upper Limit",
+    "9F55": "Geographic Indicator",
+    "9F56": "Issuer Authentication Indicator",
+    "9F57": "Issuer Country Code for Authorization",
+    "9F58": "Lower Consecutive Offline Limit (International)",
+    "9F59": "Upper Consecutive Offline Limit (International)",
+    "9F5A": "Application Program Identifier (API)",
+    "9F5B": "Issuer Script Results",
+    "9F5C": "Cumulative Total Transaction Amount",
+    "9F5D": "Available Offline Spending Amount",
+    "9F5E": "Consecutive Transaction Limit (International - Country)",
+    "9F5F": "Application Version Number",
+    "BF0C": "File Control Information (FCI) Issuer Discretionary Data"
+};
 
-// Initialize
-document.addEventListener('DOMContentLoaded', function() {
-    const input = document.getElementById('tlv-input');
-    const autoParse = document.getElementById('auto-parse');
-    
-    input.addEventListener('input', function() {
-        if (autoParse.checked) {
-            parseTLV();
-        }
-    });
-    
-    // Load any saved data
-    const saved = localStorage.getItem('tlv-input');
-    if (saved) {
-        input.value = saved;
-        if (autoParse.checked) {
-            parseTLV();
-        }
-    }
-});
-
-function setInputFormat(format) {
-    currentFormat = format;
-    document.getElementById('btn-hex').className = format === 'hex' 
-        ? 'px-3 py-1 rounded text-xs font-medium bg-blue-600 text-white'
-        : 'px-3 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300';
-    document.getElementById('btn-base64').className = format === 'base64'
-        ? 'px-3 py-1 rounded text-xs font-medium bg-blue-600 text-white'
-        : 'px-3 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300';
-    document.getElementById('info-format').textContent = format.toUpperCase();
-    
-    if (document.getElementById('auto-parse').checked) {
-        parseTLV();
-    }
-}
-
-function insertTag(tag) {
-    const input = document.getElementById('tlv-input');
-    const cursorPos = input.selectionStart;
-    const textBefore = input.value.substring(0, cursorPos);
-    const textAfter = input.value.substring(cursorPos);
-    
-    // Add some spacing if needed
-    const prefix = textBefore.length > 0 && !textBefore.endsWith('\n') && !textBefore.endsWith(' ') ? ' ' : '';
-    
-    input.value = textBefore + prefix + tag;
-    input.focus();
-    input.setSelectionRange(cursorPos + prefix.length + tag.length, cursorPos + prefix.length + tag.length);
-    
-    if (document.getElementById('auto-parse').checked) {
-        parseTLV();
-    }
-}
-
-function loadExample() {
-    const example = '9F02060000000010009F03060000000000009F1A0201565F2A0201569A032105269C01005F3401019F3303E0F8C8';
-    document.getElementById('tlv-input').value = example;
-    setInputFormat('hex');
-    parseTLV();
-}
-
-function clearAll() {
-    document.getElementById('tlv-input').value = '';
-    document.getElementById('parsed-output').innerHTML = `
-        <div class="text-center text-gray-500 py-20">
-            <i class="fas fa-inbox text-4xl mb-4 opacity-50"></i>
-            <p>ÇëÊäÈë TLV Êı¾İ²¢µã»÷½âÎö</p>
-        </div>
-    `;
-    document.getElementById('hex-view').innerHTML = `
-        <div class="text-center text-gray-500 py-8">
-            <p>½âÎöºó½«ÏÔÊ¾ÏêÏ¸µÄÊ®Áù½øÖÆÊÓÍ¼</p>
-        </div>
-    `;
-    updateInfo(0, 0, 'µÈ´ıÊäÈë');
-    localStorage.removeItem('tlv-input');
-}
-
-function parseTLV() {
-    const input = document.getElementById('tlv-input').value.trim();
-    if (!input) {
-        clearAll();
-        return;
-    }
-    
-    // Save to localStorage
-    localStorage.setItem('tlv-input', input);
-    
-    let bytes;
-    try {
-        if (currentFormat === 'hex') {
-            bytes = hexToBytes(input);
-        } else {
-            bytes = base64ToBytes(input);
-        }
-    } catch (e) {
-        showError('Êı¾İ¸ñÊ½´íÎó: ' + e.message);
-        return;
-    }
-    
-    updateInfo(bytes.length, 0, '½âÎöÖĞ...');
-    
-    try {
-        parsedData = parseTLVBytes(bytes, 0, bytes.length);
-        renderParsedResult(parsedData);
-        renderHexView(bytes, parsedData);
-        updateInfo(bytes.length, countTLVElements(parsedData), '½âÎö³É¹¦');
-    } catch (e) {
-        showError('½âÎö´íÎó: ' + e.message);
-    }
-}
-
-function hexToBytes(hex) {
-    // Remove spaces and newlines
-    hex = hex.replace(/\s/g, '');
-    
-    if (hex.length % 2 !== 0) {
-        throw new Error('HEX ×Ö·û´®³¤¶È±ØĞëÎªÅ¼Êı');
-    }
-    
-    if (!/^[0-9A-Fa-f]+$/.test(hex)) {
-        throw new Error('°üº¬ÎŞĞ§µÄ HEX ×Ö·û');
-    }
-    
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < hex.length; i += 2) {
-        bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
-    }
-    return bytes;
-}
-
-function base64ToBytes(base64) {
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-}
-
-function parseTLVBytes(bytes, offset, length) {
-    const results = [];
-    let pos = offset;
-    const end = offset + length;
-    
-    while (pos < end) {
-        if (pos >= bytes.length) break;
-        
-        // Parse Tag
-        const tagResult = parseTag(bytes, pos);
-        pos = tagResult.nextPos;
-        
-        if (pos >= bytes.length) {
-            throw new Error('Êı¾İ²»ÍêÕû: È±ÉÙ³¤¶È×Ö¶Î');
-        }
-        
-        // Parse Length
-        const lengthResult = parseLength(bytes, pos);
-        pos = lengthResult.nextPos;
-        const valueLength = lengthResult.value;
-        
-        if (pos + valueLength > bytes.length) {
-            throw new Error(`Êı¾İ²»ÍêÕû: Tag ${tagResult.tagHex} ĞèÒª ${valueLength} ×Ö½Ú£¬µ«Ö»Ê£ ${bytes.length - pos} ×Ö½Ú`);
-        }
-        
-        // Extract Value
-        const valueBytes = bytes.slice(pos, pos + valueLength);
-        pos += valueLength;
-        
-        const tlvElement = {
-            tag: tagResult.tagHex,
-            tagBytes: tagResult.tagBytes,
-            length: valueLength,
-            lengthBytes: lengthResult.lengthBytes,
-            value: valueBytes,
-            valueHex: bytesToHex(valueBytes),
-            valueAscii: bytesToAscii(valueBytes),
-            isConstructed: tagResult.isConstructed,
-            children: []
+class EMVParserApp {
+    constructor() {
+        this.inputEl = document.getElementById('hexInput');
+        this.resultContainer = document.getElementById('resultContainer');
+        this.historyList = document.getElementById('historyList');
+        this.stats = {
+            tags: document.getElementById('statTags'),
+            length: document.getElementById('statLength'),
+            status: document.getElementById('statStatus')
         };
         
-        // If constructed, parse children
-        if (tlvElement.isConstructed && valueLength > 0) {
-            try {
-                tlvElement.children = parseTLVBytes(valueBytes, 0, valueLength);
-            } catch (e) {
-                // If parsing children fails, keep as primitive
-                tlvElement.isConstructed = false;
+        this.init();
+    }
+
+    init() {
+        this.loadHistory();
+        // Auto-resize textarea logic could go here if needed
+    }
+
+    // --- Core Parsing Logic ---
+
+    parseHex(hexString) {
+        // Clean input: remove spaces, newlines, non-hex chars
+        const cleanHex = hexString.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+        if (cleanHex.length === 0) return null;
+        if (cleanHex.length % 2 !== 0) throw new Error("Invalid Hex Length: Must be even.");
+
+        const bytes = [];
+        for (let i = 0; i < cleanHex.length; i += 2) {
+            bytes.push(parseInt(cleanHex.substr(i, 2), 16));
+        }
+        return bytes;
+    }
+
+    parseTLV(bytes, offset = 0, length = null) {
+        const results = [];
+        const endOffset = length !== null ? offset + length : bytes.length;
+
+        while (offset < endOffset) {
+            if (offset >= bytes.length) break;
+
+            // 1. Parse Tag
+            let tagBytes = [];
+            let tagByte = bytes[offset];
+            tagBytes.push(tagByte);
+            offset++;
+
+            // Check for multi-byte tag (bits 5-1 of first byte are 11111)
+            if ((tagByte & 0x1F) === 0x1F) {
+                while (offset < bytes.length) {
+                    const nextByte = bytes[offset];
+                    tagBytes.push(nextByte);
+                    offset++;
+                    if ((nextByte & 0x80) === 0) break; // High bit 0 means end of tag
+                }
             }
-        }
-        
-        results.push(tlvElement);
-    }
-    
-    return results;
-}
 
-function parseTag(bytes, offset) {
-    let pos = offset;
-    let tagByte = bytes[pos];
-    let tagHex = padHex(tagByte);
-    let isConstructed = (tagByte & 0x20) !== 0;
-    
-    // Check if tag is multi-byte
-    if ((tagByte & 0x1F) === 0x1F) {
-        pos++;
-        if (pos >= bytes.length) {
-            throw new Error('Êı¾İ²»ÍêÕû: Tag ×Ö½ÚÈ±Ê§');
-        }
-        tagByte = bytes[pos];
-        tagHex += padHex(tagByte);
-        
-        // Continue reading while bit 8 is set
-        while ((tagByte & 0x80) !== 0) {
-            pos++;
-            if (pos >= bytes.length) {
-                throw new Error('Êı¾İ²»ÍêÕû: Tag ×Ö½ÚÈ±Ê§');
+            const tagHex = tagBytes.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join('');
+
+            // 2. Parse Length
+            if (offset >= bytes.length) throw new Error(`Unexpected end of data after Tag ${tagHex}`);
+            
+            let lenByte = bytes[offset];
+            offset++;
+            let valueLength = 0;
+
+            if ((lenByte & 0x80) === 0) {
+                // Short form
+                valueLength = lenByte;
+            } else {
+                // Long form
+                const numLenBytes = lenByte & 0x7F;
+                if (numLenBytes > 4) throw new Error(`Unsupported length field size at Tag ${tagHex}`);
+                
+                valueLength = 0;
+                for (let i = 0; i < numLenBytes; i++) {
+                    if (offset >= bytes.length) throw new Error(`Unexpected end of data in length field at Tag ${tagHex}`);
+                    valueLength = (valueLength << 8) | bytes[offset];
+                    offset++;
+                }
             }
-            tagByte = bytes[pos];
-            tagHex += padHex(tagByte);
-        }
-    }
-    
-    return {
-        tagHex: tagHex.toUpperCase(),
-        tagBytes: bytes.slice(offset, pos + 1),
-        isConstructed: isConstructed,
-        nextPos: pos + 1
-    };
-}
 
-function parseLength(bytes, offset) {
-    let pos = offset;
-    let lengthByte = bytes[pos];
-    let lengthBytes = [lengthByte];
-    let value;
-    
-    if ((lengthByte & 0x80) === 0) {
-        // Short form
-        value = lengthByte;
-        pos++;
-    } else {
-        // Long form
-        const numBytes = lengthByte & 0x7F;
-        if (numBytes === 0) {
-            throw new Error('²»Ö§³Ö indefinite length');
-        }
-        if (numBytes > 4) {
-            throw new Error('³¤¶È×Ö¶Î¹ı³¤');
-        }
-        
-        pos++;
-        value = 0;
-        for (let i = 0; i < numBytes; i++) {
-            if (pos >= bytes.length) {
-                throw new Error('Êı¾İ²»ÍêÕû: ³¤¶È×Ö½ÚÈ±Ê§');
+            // 3. Parse Value
+            if (offset + valueLength > bytes.length) {
+                 // Handle truncated data gracefully or throw error depending on strictness
+                 // For demo, we'll take what's available but mark it
+                 console.warn(`Truncated value for tag ${tagHex}`);
             }
-            value = (value << 8) | bytes[pos];
-            lengthBytes.push(bytes[pos]);
-            pos++;
+            
+            const valueBytes = bytes.slice(offset, offset + valueLength);
+            offset += valueLength;
+
+            // Construct Node
+            const node = {
+                tag: tagHex,
+                name: EMV_TAGS[tagHex] || "Unknown Tag",
+                length: valueLength,
+                rawValue: valueBytes,
+                ascii: this.bytesToAscii(valueBytes),
+                hex: valueBytes.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' '),
+                children: []
+            };
+
+            // Recursive parsing for constructed tags (Bit 6 of first tag byte is 1)
+            // Common constructed tags: 6F, 70, 77, A5, BF0C, etc.
+            // Simple heuristic: if bit 6 is set, it's constructed.
+            if ((tagBytes & 0x20) !== 0) {
+                try {
+                    node.children = this.parseTLV(valueBytes, 0, valueLength);
+                } catch (e) {
+                    // If recursive parse fails, treat as primitive
+                    console.warn(`Failed to parse constructed tag ${tagHex} as TLV, treating as primitive.`);
+                }
+            }
+
+            results.push(node);
         }
+        return results;
     }
-    
-    return {
-        value: value,
-        lengthBytes: new Uint8Array(lengthBytes),
-        nextPos: pos
-    };
-}
 
-function bytesToHex(bytes) {
-    return Array.from(bytes).map(b => padHex(b)).join('').toUpperCase();
-}
-
-function bytesToAscii(bytes) {
-    let result = '';
-    for (let i = 0; i < bytes.length; i++) {
-        const code = bytes[i];
-        if (code >= 32 && code <= 126) {
-            result += String.fromCharCode(code);
-        } else {
-            result += '.';
-        }
-    }
-    return result;
-}
-
-function padHex(byte) {
-    return byte.toString(16).padStart(2, '0');
-}
-
-function countTLVElements(elements) {
-    let count = elements.length;
-    for (const elem of elements) {
-        if (elem.children && elem.children.length > 0) {
-            count += countTLVElements(elem.children);
-        }
-    }
-    return count;
-}
-
-function renderParsedResult(elements, level = 0) {
-    const container = document.getElementById('parsed-output');
-    const showAscii = document.getElementById('show-ascii').checked;
-    
-    if (level === 0) {
-        container.innerHTML = '';
-    }
-    
-    if (elements.length === 0 && level === 0) {
-        container.innerHTML = `
-            <div class="text-center text-gray-500 py-20">
-                <i class="fas fa-check-circle text-4xl mb-4 text-green-500"></i>
-                <p>½âÎöÍê³É£¬µ«Ã»ÓĞÕÒµ½ TLV ÔªËØ</p>
-            </div>
-        `;
-        return;
-    }
-    
-    const div = document.createElement('div');
-    div.className = 'animate-fade-in';
-    
-    elements.forEach((elem, index) => {
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'mb-2 hover-row rounded-lg p-3 transition-all';
-        if (level > 0) {
-            itemDiv.style.marginLeft = (level * 20) + 'px';
-            itemDiv.style.borderLeft = '2px solid rgba(96, 165, 250, 0.3)';
-        }
-        
-        const tagDesc = getTagDescription(elem.tag);
-        
-        itemDiv.innerHTML = `
-            <div class="flex items-start justify-between">
-                <div class="flex-1">
-                    <div class="flex items-center space-x-2 mb-1">
-                        <span class="tlv-tag mono-font text-sm">${elem.tag}</span>
-                        ${elem.isConstructed ? '<span class="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded">¹¹ÔìĞÍ</span>' : ''}
-                        ${tagDesc ? `<span class="text-xs text-gray-500">${tagDesc}</span>` : ''}
-                    </div>
-                    <div class="flex items-center space-x-4 text-xs">
-                        <span class="text-gray-500">³¤¶È: <span class="tlv-length mono-font">${elem.length}</span> ×Ö½Ú</span>
-                        ${!elem.isConstructed ? `
-                            <span class="text-gray-500">Öµ: <span class="tlv-value mono-font">${elem.valueHex}</span></span>
-                            ${showAscii ? `<span class="text-gray-500">ASCII: <span class="tlv-value-ascii mono-font">${elem.valueAscii}</span></span>` : ''}
-                        ` : ''}
-                    </div>
-                </div>
-                <button onclick="copyValue('${elem.valueHex}')" class="text-gray-500 hover:text-blue-400 transition" title="¸´ÖÆÖµ">
-                    <i class="fas fa-copy"></i>
-                </button>
-            </div>
-        `;
-        
-        div.appendChild(itemDiv);
-        
-        // Render children if constructed
-        if (elem.isConstructed && elem.children && elem.children.length > 0) {
-            const childrenDiv = document.createElement('div');
-            childrenDiv.className = 'mt-2';
-            div.appendChild(childrenDiv);
-            renderParsedResultToContainer(elem.children, childrenDiv, level + 1);
-        }
-    });
-    
-    if (level === 0) {
-        container.appendChild(div);
-    } else {
-        return div;
-    }
-}
-
-function renderParsedResultToContainer(elements, container, level) {
-    const showAscii = document.getElementById('show-ascii').checked;
-    
-    elements.forEach((elem, index) => {
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'mb-2 hover-row rounded-lg p-3 transition-all';
-        if (level > 0) {
-            itemDiv.style.marginLeft = (level * 20) + 'px';
-            itemDiv.style.borderLeft = '2px solid rgba(96, 165, 250, 0.3)';
-        }
-        
-        const tagDesc = getTagDescription(elem.tag);
-        
-        itemDiv.innerHTML = `
-            <div class="flex items-start justify-between">
-                <div class="flex-1">
-                    <div class="flex items-center space-x-2 mb-1">
-                        <span class="tlv-tag mono-font text-sm">${elem.tag}</span>
-                        ${elem.isConstructed ? '<span class="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded">¹¹ÔìĞÍ</span>' : ''}
-                        ${tagDesc ? `<span class="text-xs text-gray-500">${tagDesc}</span>` : ''}
-                    </div>
-                    <div class="flex items-center space-x-4 text-xs">
-                        <span class="text-gray-500">³¤¶È: <span class="tlv-length mono-font">${elem.length}</span> ×Ö½Ú</span>
-                        ${!elem.isConstructed ? `
-                            <span class="text-gray-500">Öµ: <span class="tlv-value mono-font">${elem.valueHex}</span></span>
-                            ${showAscii ? `<span class="text-gray-500">ASCII: <span class="tlv-value-ascii mono-font">${elem.valueAscii}</span></span>` : ''}
-                        ` : ''}
-                    </div>
-                </div>
-                <button onclick="copyValue('${elem.valueHex}')" class="text-gray-500 hover:text-blue-400 transition" title="¸´ÖÆÖµ">
-                    <i class="fas fa-copy"></i>
-                </button>
-            </div>
-        `;
-        
-        container.appendChild(itemDiv);
-        
-        // Render children if constructed
-        if (elem.isConstructed && elem.children && elem.children.length > 0) {
-            const childrenDiv = document.createElement('div');
-            childrenDiv.className = 'mt-2';
-            container.appendChild(childrenDiv);
-            renderParsedResultToContainer(elem.children, childrenDiv, level + 1);
-        }
-    });
-}
-
-function renderHexView(bytes, tlvElements) {
-    const container = document.getElementById('hex-view');
-    const lines = [];
-    const bytesPerLine = 16;
-    
-    for (let i = 0; i < bytes.length; i += bytesPerLine) {
-        const chunk = bytes.slice(i, Math.min(i + bytesPerLine, bytes.length));
-        const hexPart = Array.from(chunk).map(b => padHex(b)).join(' ').toUpperCase();
-        const asciiPart = Array.from(chunk).map(b => {
-            const code = b;
-            return (code >= 32 && code <= 126) ? String.fromCharCode(code) : '.';
+    bytesToAscii(bytes) {
+        return bytes.map(b => {
+            if (b >= 32 && b <= 126) return String.fromCharCode(b);
+            return '.';
         }).join('');
+    }
+
+    // --- UI Rendering ---
+
+    renderTree(nodes, container, depth = 0) {
+        container.innerHTML = '';
+        if (!nodes || nodes.length === 0) {
+            container.innerHTML = '<div class="text-slate-400 italic">No valid TLV structure found.</div>';
+            return;
+        }
+
+        const ul = document.createElement('ul');
+        ul.className = 'space-y-1';
         
-        const offset = padHex(Math.floor(i / 16)).padStart(8, '0').toUpperCase();
-        lines.push(`<div class="flex"><span class="text-gray-600 w-24 mono-font">${offset}</span><span class="mono-font text-blue-300 flex-1">${hexPart.padEnd(47)}</span><span class="text-gray-500 mono-font ml-4">${asciiPart}</span></div>`);
+        nodes.forEach(node => {
+            const li = document.createElement('li');
+            li.className = 'relative pl-6 py-1';
+            
+            // Connector lines
+            if (depth > 0) {
+                const line = document.createElement('div');
+                line.className = 'absolute left-0 top-0 bottom-0 w-px bg-slate-300';
+                // Adjust line height to not overlap with sibling connectors visually if needed, 
+                // but simple full height usually works for tree views
+                li.appendChild(line);
+                
+                const connector = document.createElement('div');
+                connector.className = 'absolute left-0 top-4 w-4 h-px bg-slate-300';
+                li.appendChild(connector);
+            }
+
+            // Node Content
+            const content = document.createElement('div');
+            content.className = 'group flex flex-wrap items-start gap-2 p-2 rounded hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all cursor-default';
+            
+            // Tag Badge
+            const tagBadge = document.createElement('span');
+            tagBadge.className = `inline-flex items-center px-2 py-0.5 rounded text-xs font-bold font-mono ${this.isKnownTag(node.tag) ? 'bg-brand-100 text-brand-700' : 'bg-slate-200 text-slate-600'}`;
+            tagBadge.textContent = node.tag;
+            
+            // Name
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'text-sm font-medium text-slate-700';
+            nameSpan.textContent = node.name;
+
+            // Meta Info (Length)
+            const metaSpan = document.createElement('span');
+            metaSpan.className = 'text-xs text-slate-400 font-mono';
+            metaSpan.textContent = `[${node.length} bytes]`;
+
+            // Value Preview (if primitive)
+            let valuePreview = document.createElement('span');
+            if (node.children.length === 0) {
+                valuePreview.className = 'text-xs text-slate-500 font-mono break-all ml-2 bg-slate-50 px-1 rounded border border-slate-100 max-w-full truncate';
+                valuePreview.title = node.hex;
+                valuePreview.textContent = node.ascii.length > 0 ? `"${node.ascii}"` : node.hex.substring(0, 20) + (node.hex.length > 20 ? '...' : '');
+            }
+
+            content.appendChild(tagBadge);
+            content.appendChild(nameSpan);
+            content.appendChild(metaSpan);
+            if (valuePreview) content.appendChild(valuePreview);
+
+            li.appendChild(content);
+
+            // Recurse
+            if (node.children.length > 0) {
+                const childContainer = document.createElement('div');
+                childContainer.className = 'mt-1 ml-2'; // Indentation
+                this.renderTree(node.children, childContainer, depth + 1);
+                li.appendChild(childContainer);
+            }
+
+            ul.appendChild(li);
+        });
+
+        container.appendChild(ul);
     }
-    
-    container.innerHTML = lines.join('');
-}
 
-function getTagDescription(tag) {
-    const descriptions = {
-        '9F02': 'ÊÚÈ¨½ğ¶î (Amount, Authorized)',
-        '9F03': 'ÆäËû½ğ¶î (Amount, Other)',
-        '9F1A': '¹ú¼Ò´úÂë (Country Code)',
-        '5F2A': '½»Ò×»õ±Ò´úÂë (Transaction Currency Code)',
-        '9A': '½»Ò×ÈÕÆÚ (Transaction Date)',
-        '9C': '½»Ò×ÀàĞÍ (Transaction Type)',
-        '5F34': 'Ó¦ÓÃ PAN ĞòÁĞºÅ (Application PAN Sequence Number)',
-        '9F33': 'ÖÕ¶ËÄÜÁ¦ (Terminal Capabilities)',
-        '9F34': '³Ö¿¨ÈËÑéÖ¤·½·¨½á¹û (CVM Results)',
-        '9F35': 'ÖÕ¶ËÀàĞÍ (Terminal Type)',
-        '9F36': 'Ó¦ÓÃ½»Ò×¼ÆÊıÆ÷ (Application Transaction Counter)',
-        '9F37': '²»¿ÉÔ¤²âÊı (Unpredictable Number)',
-        '9F41': '½»Ò×ĞòÁĞ¼ÆÊıÆ÷ (Transaction Sequence Counter)',
-        '5F20': '³Ö¿¨ÈËĞÕÃû (Cardholder Name)',
-        '5F24': 'Ó¦ÓÃµ½ÆÚÈÕÆÚ (Application Expiration Date)',
-        '5F25': 'Ó¦ÓÃÉúĞ§ÈÕÆÚ (Application Effective Date)',
-        '5F28': '·¢¿¨ĞĞ¹ú¼Ò´úÂë (Issuer Country Code)',
-        '5F30': '·şÎñ´úÂë (Service Code)',
-        '5F36': '½»Ò×»õ±ÒÖ¸Êı (Transaction Currency Exponent)',
-        '9F07': 'Ó¦ÓÃÊ¹ÓÃ¿ØÖÆ (Application Usage Control)',
-        '9F08': 'Ó¦ÓÃ°æ±¾ºÅ (Application Version Number)',
-        '9F09': 'Ó¦ÓÃ°æ±¾ºÅ (Application Version Number)',
-        '9F0D': '·¢¿¨ĞĞĞĞÎª´úÂë (Issuer Action Code - Default)',
-        '9F0E': '·¢¿¨ĞĞĞĞÎª´úÂë (Issuer Action Code - Denial)',
-        '9F0F': '·¢¿¨ĞĞĞĞÎª´úÂë (Issuer Action Code - Online)',
-        '9F10': '·¢¿¨ĞĞÓ¦ÓÃÊı¾İ (Issuer Application Data)',
-        '9F11': '·¢¿¨ĞĞ´úÂë±íË÷Òı (Issuer Code Table Index)',
-        '9F12': 'Ó¦ÓÃÊ×Ñ¡Ãû³Æ (Application Preferred Name)',
-        '9F13': '×îºóÔÚÏß ATC ×¢²á (Last Online ATC Register)',
-        '9F14': '×îµÍÀëÏß½ğ¶îÏŞÖÆ (Lower Consecutive Offline Limit)',
-        '9F15': 'ÉÌ»§Àà±ğÂë (Merchant Category Code)',
-        '9F16': 'ÉÌ»§±êÊ¶·û (Merchant Identifier)',
-        '9F17': 'PIN ³¢ÊÔ¼ÆÊıÆ÷ (PIN Try Counter)',
-        '9F1B': 'ÖÕ¶ËµØ°åÏŞÖÆ (Terminal Floor Limit)',
-        '9F1C': 'ÖÕ¶Ë±êÊ¶·û (Terminal Identification)',
-        '9F1D': 'ÖÕ¶Ë·çÏÕ¹ÜÀíÊı¾İ (Terminal Risk Management Data)',
-        '9F1E': '½Ó¿ÚÉè±¸ĞòÁĞºÅ (Interface Device Serial Number)',
-        '9F1F': '´ÅÌõ¹ìµÀ 1 Êı¾İ (Track 1 Discretionary Data)',
-        '9F21': '½»Ò×Ê±¼ä (Transaction Time)',
-        '9F22': 'ÈÏÖ¤ÖĞĞÄ¹«Ô¿Ö¸Êı (Certification Authority Public Key Exponent)',
-        '9F23': 'Á¬ĞøÀëÏß½»Ò×ÉÏÏŞ (Upper Consecutive Offline Limit)',
-        '9F26': 'Ó¦ÓÃÃÜÎÄ (Application Cryptogram)',
-        '9F27': 'ÃÜÎÄĞÅÏ¢Êı¾İ (Cryptogram Information Data)',
-        '9F2D': 'IC ¿¨ PIN ¼ÓÃÜÃÜÔ¿ (ICC PIN Encipherment Public Key Exponent)',
-        '9F2E': 'IC ¿¨ PIN ¼ÓÃÜÃÜÔ¿ (ICC PIN Encipherment Public Key Remainder)',
-        '9F2F': 'IC ¿¨ PIN ¼ÓÃÜÃÜÔ¿ (ICC PIN Encipherment Public Key Modulus)',
-        '9F32': '·¢¿¨ĞĞ¹«Ô¿Ö¸Êı (Issuer Public Key Exponent)',
-        '9F38': '´¦ÀíÑ¡ÏîÊı¾İ¶ÔÏóÁĞ±í (Processing Options Data Object List - PDOL)',
-        '9F39': 'POS ÊäÈëÄÜÁ¦ (POS Entry Mode)',
-        '9F3A': '½ğ¶î²Î¿¼»õ±Ò (Amount, Reference Currency)',
-        '9F3B': 'Ó¦ÓÃ²Î¿¼»õ±Ò (Application Reference Currency)',
-        '9F3C': '½»Ò×²Î¿¼»õ±Ò´úÂë (Transaction Reference Currency Code)',
-        '9F3D': '½»Ò×²Î¿¼»õ±ÒÖ¸Êı (Transaction Reference Currency Exponent)',
-        '9F40': '¸½¼ÓÖÕ¶ËÄÜÁ¦ (Additional Terminal Capabilities)',
-        '9F42': 'Ó¦ÓÃ»õ±Ò´úÂë (Application Currency Code)',
-        '9F43': 'Ó¦ÓÃ»õ±ÒÖ¸Êı (Application Currency Exponent)',
-        '9F44': 'Ó¦ÓÃ»õ±ÒÖ¸Êı (Application Currency Exponent)',
-        '9F45': 'Êı¾İÈÏÖ¤Âë (Data Authentication Code)',
-        '9F46': 'IC ¿¨¹«Ô¿Ö¤Êé (ICC Public Key Certificate)',
-        '9F47': 'IC ¿¨¹«Ô¿Ö¸Êı (ICC Public Key Exponent)',
-        '9F48': 'IC ¿¨¹«Ô¿ÓàÊı (ICC Public Key Remainder)',
-        '9F49': '¶¯Ì¬Êı¾İÈÏÖ¤Êı¾İ¶ÔÏóÁĞ±í (Dynamic Data Authentication Data Object List - DDOL)',
-        '9F4A': '¾²Ì¬Êı¾İÈÏÖ¤±êÇ©ÁĞ±í (Static Data Authentication Tag List)',
-        '9F4B': 'IC ¿¨¶¯Ì¬Êı¾İÇ©Ãû (ICC Dynamic Number)',
-        '9F4C': 'IC ¿¨¶¯Ì¬Êı¾İ (ICC Dynamic Data)',
-        '9F4D': 'ÈÕÖ¾ÌõÄ¿ (Log Entry)',
-        '9F4E': 'ÉÌ»§Ãû³ÆºÍÎ»ÖÃ (Merchant Name and Location)',
-        '9F4F': 'ÈÕÖ¾¸ñÊ½ (Log Format)',
-        '50': 'Ó¦ÓÃ±êÇ© (Application Label)',
-        '57': '´ÅÌõ¹ìµÀ 2 µÈĞ§Êı¾İ (Track 2 Equivalent Data)',
-        '5A': 'Ó¦ÓÃÖ÷ÕËºÅ (Application Primary Account Number - PAN)',
-        '5F2D': 'ÓïÑÔÆ«ºÃ (Language Preference)',
-        '5F50': '·¢¿¨ĞĞ URL (Issuer URL)',
-        '5F53': '¹ú¼Ê IBAN (International Bank Account Number - IBAN)',
-        '5F54': 'ÒøĞĞ±êÊ¶´úÂë (Bank Identifier Code - BIC)',
-        '5F55': '·¢¿¨ÈË¹ú¼Ò´úÂë (Issuer Country Code - alpha2 format)',
-        '5F56': '·¢¿¨ÈË¹ú¼Ò´úÂë (Issuer Country Code - alpha3 format)',
-        '6F': 'ÎÄ¼ş¿ØÖÆĞÅÏ¢Ä£°å (File Control Information - FCI Template)',
-        '70': '¼ÇÂ¼Ä£°å (Record Template)',
-        '77': 'ÏìÓ¦ÏûÏ¢Ä£°å 2 (Response Message Template Format 2)',
-        '80': 'ÏìÓ¦ÏûÏ¢Ä£°å 1 (Response Message Template Format 1)',
-        '82': 'Ó¦ÓÃ interchange ÅäÖÃÎÄ¼ş (Application Interchange Profile - AIP)',
-        '83': 'ÃüÁîÄ£°å (Command Template)',
-        '84': '×¨ÓÃÎÄ¼şÃû³Æ (Dedicated File Name - DFN)',
-        '86': ' issuer ½Å±¾ÃüÁî (Issuer Script Command)',
-        '87': 'Ó¦ÓÃÓÅÏÈÖ¸Ê¾Æ÷ (Application Priority Indicator)',
-        '88': '¶ÌÎÄ¼ş±êÊ¶·û (Short File Identifier - SFI)',
-        '89': 'ÊÚÈ¨ÏìÓ¦´úÂë (Authorisation Response Code)',
-        '8A': 'ÊÚÈ¨ÏìÓ¦´úÂë (Authorisation Response Code)',
-        '8C': '¿¨Æ¬·çÏÕ¹ÜÀíÊı¾İ¶ÔÏóÁĞ±í 1 (Card Risk Management Data Object List 1 - CDOL1)',
-        '8D': '¿¨Æ¬·çÏÕ¹ÜÀíÊı¾İ¶ÔÏóÁĞ±í 2 (Card Risk Management Data Object List 2 - CDOL2)',
-        '8E': '³Ö¿¨ÈËÑéÖ¤·½·¨ÁĞ±í (Cardholder Verification Method - CVM List)',
-        '8F': 'ÈÏÖ¤ÖĞĞÄ¹«Ô¿Ë÷Òı (Certification Authority Public Key Index)',
-        '90': 'IC ¿¨¹«Ô¿Ö¤Êé (ICC Public Key Certificate)',
-        '91': '·¢¿¨ĞĞÈÏÖ¤Êı¾İ (Issuer Authentication Data)',
-        '92': '·¢¿¨ĞĞ¹«Ô¿ÓàÊı (Issuer Public Key Remainder)',
-        '93': 'Ç©Ãû¾²Ì¬Ó¦ÓÃÊı¾İ (Signed Static Application Data)',
-        '94': 'Ó¦ÓÃÎÄ¼ş¶¨Î»Æ÷ (Application File Locator - AFL)',
-        '95': 'ÖÕ¶ËÑéÖ¤½á¹û (Terminal Verification Results - TVR)',
-        '96': '½»Ò×Ö¤Êé¹şÏ£Öµ (Transaction Certificate Hash Value)',
-        '97': '½»Ò×Ö¤ÊéÊı¾İ¶ÔÏóÁĞ±í (Transaction Certificate Data Object List - TDOL)',
-        '98': '½»Ò×Ö¤Êé (Transaction Certificate - TC)',
-        '99': '½»Ò×¸öÈËÊ¶±ğÂëÊı¾İ (Transaction Personal Identification Number - PIN Data)',
-        '9B': '½»Ò××´Ì¬ĞÅÏ¢ (Transaction Status Information)',
-        '9D': 'Ä¿Â¼¶¨ÒåÎÄ¼ş (Directory Definition File - DDF)',
-        'BF0C': 'ÎÄ¼ş¿ØÖÆĞÅÏ¢²ÎÊıÄ£°å (FCI Parameter Template)'
-    };
-    
-    return descriptions[tag.toUpperCase()] || null;
-}
-
-function updateInfo(length, count, status) {
-    document.getElementById('info-length').textContent = length + ' bytes';
-    document.getElementById('info-count').textContent = count;
-    
-    const statusEl = document.getElementById('info-status');
-    statusEl.textContent = status;
-    
-    if (status === '½âÎö³É¹¦') {
-        statusEl.className = 'text-sm font-medium text-green-400';
-    } else if (status === '½âÎöÖĞ...') {
-        statusEl.className = 'text-sm font-medium text-yellow-400';
-    } else if (status.startsWith('´íÎó')) {
-        statusEl.className = 'text-sm font-medium text-red-400';
-    } else {
-        statusEl.className = 'text-sm font-medium text-gray-400';
+    isKnownTag(tag) {
+        return EMV_TAGS.hasOwnProperty(tag);
     }
-}
 
-function showError(message) {
-    const container = document.getElementById('parsed-output');
-    container.innerHTML = `
-        <div class="bg-red-500/10 border border-red-500/30 rounded-lg p-4 animate-fade-in">
-            <div class="flex items-start">
-                <i class="fas fa-exclamation-triangle text-red-400 mt-1 mr-3"></i>
-                <div>
-                    <h4 class="text-red-400 font-semibold mb-1">½âÎö´íÎó</h4>
-                    <p class="text-red-300 text-sm">${message}</p>
-                </div>
+    // --- Actions ---
+
+    parse() {
+        const input = this.inputEl.value.trim();
+        if (!input) {
+            this.showError("è¯·è¾“å…¥ HEX æ•°æ®");
+            return;
+        }
+
+        try {
+            this.stats.status.textContent = "Parsing...";
+            this.stats.status.className = "text-sm font-bold text-yellow-600 mt-1 bg-yellow-50 px-2 py-1 rounded-full";
+            
+            // Small delay to allow UI update
+            setTimeout(() => {
+                try {
+                    const bytes = this.parseHex(input);
+                    const result = this.parseTLV(bytes);
+                    
+                    this.renderTree(result, this.resultContainer);
+                    this.updateStats(result, bytes.length);
+                    this.addToHistory(input.substring(0, 30) + "...", result.length);
+                    
+                    this.stats.status.textContent = "Success";
+                    this.stats.status.className = "text-sm font-bold text-emerald-600 mt-1 bg-emerald-50 px-2 py-1 rounded-full";
+                } catch (e) {
+                    this.showError(e.message);
+                }
+            }, 50);
+
+        } catch (e) {
+            this.showError(e.message);
+        }
+    }
+
+    updateStats(nodes, totalBytes) {
+        // Count total tags recursively
+        let count = 0;
+        const countTags = (n) => {
+            n.forEach(node => {
+                count++;
+                if (node.children.length > 0) countTags(node.children);
+            });
+        };
+        countTags(nodes);
+
+        this.stats.tags.textContent = count;
+        this.stats.length.textContent = `${totalBytes} B`;
+    }
+
+    showError(msg) {
+        this.resultContainer.innerHTML = `
+            <div class="flex flex-col items-center justify-center h-64 text-red-500 fade-in">
+                <i class="fa-solid fa-circle-exclamation text-4xl mb-3"></i>
+                <p class="font-medium">è§£æé”™è¯¯</p>
+                <p class="text-sm text-slate-500 mt-1">${msg}</p>
             </div>
-        </div>
-    `;
-    updateInfo(0, 0, '´íÎó: ' + message);
-}
-
-function copyValue(value) {
-    navigator.clipboard.writeText(value).then(() => {
-        showToast('ÒÑ¸´ÖÆµ½¼ôÌù°å');
-    }).catch(err => {
-        console.error('¸´ÖÆÊ§°Ü:', err);
-    });
-}
-
-function copyResult() {
-    if (parsedData.length === 0) {
-        showToast('Ã»ÓĞ¿É¸´ÖÆµÄÊı¾İ');
-        return;
+        `;
+        this.stats.status.textContent = "Error";
+        this.stats.status.className = "text-sm font-bold text-red-600 mt-1 bg-red-50 px-2 py-1 rounded-full";
     }
-    
-    const json = JSON.stringify(parsedData, null, 2);
-    navigator.clipboard.writeText(json).then(() => {
-        showToast('JSON ÒÑ¸´ÖÆµ½¼ôÌù°å');
-    }).catch(err => {
-        console.error('¸´ÖÆÊ§°Ü:', err);
-    });
-}
 
-function exportJSON() {
-    if (parsedData.length === 0) {
-        showToast('Ã»ÓĞ¿Éµ¼³öµÄÊı¾İ');
-        return;
+    formatInput() {
+        let val = this.inputEl.value;
+        // Remove non-hex
+        val = val.replace(/[^0-9A-Fa-f]/g, '');
+        // Add spaces every 2 chars
+        val = val.match(/.{1,2}/g)?.join(' ') || '';
+        // Wrap lines every 16 bytes (32 chars + 15 spaces = 47 chars approx)
+        // Simple approach: just insert newlines every 48 chars of the spaced string
+        const formatted = val.match(/.{1,48}/g)?.join('\n') || '';
+        this.inputEl.value = formatted;
     }
-    
-    const json = JSON.stringify(parsedData, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'tlv-parsed-' + new Date().getTime() + '.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    showToast('JSON ÎÄ¼şÒÑÏÂÔØ');
+
+    async pasteFromClipboard() {
+        try {
+            const text = await navigator.clipboard.readText();
+            this.inputEl.value = text;
+        } catch (err) {
+            alert('æ— æ³•è®¿é—®å‰ªè´´æ¿ï¼Œè¯·æ‰‹åŠ¨ç²˜è´´');
+        }
+    }
+
+    loadSample() {
+        // Sample EMV FCI Template
+        const sample = "6F 3B 84 0E A0 00 00 00 03 10 10 01 00 00 00 00 00 00 A5 29 50 0A 56 49 53 41 20 43 52 45 44 49 54 87 01 01 5F 2D 02 65 6E 9F 11 01 01 5F 24 03 25 12 31 5F 25 03 15 01 01 9F 07 02 FF 00";
+        this.inputEl.value = sample;
+        this.parse();
+    }
+
+    clearAll() {
+        this.inputEl.value = '';
+        this.resultContainer.innerHTML = `
+            <div class="flex flex-col items-center justify-center h-64 text-slate-400">
+                <i class="fa-solid fa-layer-group text-4xl mb-3 opacity-20"></i>
+                <p>ç­‰å¾…æ•°æ®è¾“å…¥...</p>
+            </div>
+        `;
+        this.stats.tags.textContent = '0';
+        this.stats.length.textContent = '0 B';
+        this.stats.status.textContent = 'Ready';
+        this.stats.status.className = "text-sm font-bold text-emerald-600 mt-1 bg-emerald-50 px-2 py-1 rounded-full";
+    }
+
+    // --- History Management ---
+
+    addToHistory(preview, tagCount) {
+        let history = JSON.parse(localStorage.getItem('emv_history') || '[]');
+        const newItem = {
+            date: new Date().toLocaleTimeString(),
+            preview: preview,
+            tagCount: tagCount
+        };
+        history.unshift(newItem);
+        if (history.length > 10) history.pop();
+        localStorage.setItem('emv_history', JSON.stringify(history));
+        this.loadHistory();
+    }
+
+    loadHistory() {
+        const history = JSON.parse(localStorage.getItem('emv_history') || '[]');
+        const list = this.historyList;
+        list.innerHTML = '';
+
+        if (history.length === 0) {
+            list.innerHTML = '<li class="p-4 text-center text-slate-400 text-sm italic">æš‚æ— å†å²è®°å½•</li>';
+            return;
+        }
+
+        history.forEach(item => {
+            const li = document.createElement('li');
+            li.className = 'p-3 hover:bg-slate-50 cursor-pointer transition-colors border-b border-slate-50 last:border-0 flex justify-between items-center group';
+            li.innerHTML = `
+                <div class="flex flex-col">
+                    <span class="text-xs font-mono text-slate-600 truncate max-w-[200px]">${item.preview}</span>
+                    <span class="text-[10px] text-slate-400">${item.date} â€¢ ${item.tagCount} Tags</span>
+                </div>
+                <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-brand-500 text-xs"></i>
+            `;
+            // Click to restore (simplified: just puts preview back, ideally would store full hex)
+            // For this demo, we won't store full hex in history to save space, just visual feedback
+            list.appendChild(li);
+        });
+    }
+
+    clearHistory() {
+        localStorage.removeItem('emv_history');
+        this.loadHistory();
+    }
+
+    // --- Export ---
+
+    exportJSON() {
+        // Re-parse to get clean object
+        const input = this.inputEl.value.trim();
+        if (!input) return;
+        try {
+            const bytes = this.parseHex(input);
+            const result = this.parseTLV(bytes);
+            const jsonStr = JSON.stringify(result, null, 2);
+            
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'emv_parsed.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            alert("æ— æ³•å¯¼å‡ºï¼šæ•°æ®è§£æå¤±è´¥");
+        }
+    }
+
+    copyResult() {
+        // Copy the text content of the result container
+        const text = this.resultContainer.innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = document.querySelector('button[onclick="app.copyResult()"]');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> å·²å¤åˆ¶';
+            setTimeout(() => btn.innerHTML = originalHtml, 2000);
+        });
+    }
 }
 
-function showToast(message) {
-    const toast = document.createElement('div');
-    toast.className = 'fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in z-50';
-    toast.innerHTML = `<i class="fas fa-check-circle text-green-400 mr-2"></i>${message}`;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transition = 'opacity 0.3s';
-        setTimeout(() => {
-            document.body.removeChild(toast);
-        }, 300);
-    }, 2000);
-}
+// Initialize App
+const app = new EMVParserApp();
