@@ -1,0 +1,298 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EMV TLV 在线解析工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+        }
+        
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .tlv-tag {
+            color: #60a5fa;
+            font-weight: 600;
+        }
+        
+        .tlv-length {
+            color: #fbbf24;
+            font-weight: 500;
+        }
+        
+        .tlv-value {
+            color: #34d399;
+        }
+        
+        .tlv-value-ascii {
+            color: #a78bfa;
+        }
+        
+        .hover-row:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            transition: all 0.2s ease;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body class="text-gray-100">
+    <!-- Header -->
+    <header class="glass-effect sticky top-0 z-50 border-b border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-microchip text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                            EMV TLV Parser
+                        </h1>
+                        <p class="text-xs text-gray-400">专业级智能卡数据解析工具</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="loadExample()" class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium">
+                        <i class="fas fa-lightbulb mr-2"></i>加载示例
+                    </button>
+                    <button onclick="clearAll()" class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium">
+                        <i class="fas fa-trash mr-2"></i>清空
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <!-- Input Section -->
+            <div class="space-y-6">
+                <!-- Input Card -->
+                <div class="glass-effect rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold flex items-center">
+                            <i class="fas fa-keyboard text-blue-400 mr-2"></i>
+                            输入数据
+                        </h2>
+                        <div class="flex space-x-2">
+                            <button onclick="setInputFormat('hex')" id="btn-hex" class="px-3 py-1 rounded text-xs font-medium bg-blue-600 text-white">
+                                HEX
+                            </button>
+                            <button onclick="setInputFormat('base64')" id="btn-base64" class="px-3 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300">
+                                Base64
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <textarea 
+                        id="tlv-input" 
+                        class="w-full h-64 bg-gray-900/50 border border-gray-700 rounded-lg p-4 mono-font text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none custom-scrollbar"
+                        placeholder="在此粘贴 HEX 或 Base64 编码的 TLV 数据...&#10;&#10;示例 HEX:&#10;9F0206000000001000&#10;9F0306000000000000&#10;9F1A020156"
+                    ></textarea>
+                    
+                    <div class="mt-4 flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="auto-parse" checked class="w-4 h-4 rounded border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-700">
+                                <span class="text-sm text-gray-400">自动解析</span>
+                            </label>
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="show-ascii" checked class="w-4 h-4 rounded border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-700">
+                                <span class="text-sm text-gray-400">显示 ASCII</span>
+                            </label>
+                        </div>
+                        <button onclick="parseTLV()" class="btn-primary px-6 py-2 rounded-lg font-medium text-white">
+                            <i class="fas fa-play mr-2"></i>解析
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Info Card -->
+                <div class="glass-effect rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">快速信息</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-900/30 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 mb-1">数据长度</div>
+                            <div id="info-length" class="text-lg font-mono font-semibold text-blue-400">0 bytes</div>
+                        </div>
+                        <div class="bg-gray-900/30 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 mb-1">TLV 元素数</div>
+                            <div id="info-count" class="text-lg font-mono font-semibold text-green-400">0</div>
+                        </div>
+                        <div class="bg-gray-900/30 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 mb-1">解析状态</div>
+                            <div id="info-status" class="text-sm font-medium text-gray-400">等待输入</div>
+                        </div>
+                        <div class="bg-gray-900/30 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 mb-1">格式</div>
+                            <div id="info-format" class="text-sm font-medium text-gray-400">HEX</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EMV Tag Reference -->
+                <div class="glass-effect rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">常用 EMV 标签参考</h3>
+                    <div class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('9F02')">
+                            <span class="mono-font text-blue-400 text-sm">9F02</span>
+                            <span class="text-xs text-gray-400">授权金额 (Amount, Authorized)</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('9F03')">
+                            <span class="mono-font text-blue-400 text-sm">9F03</span>
+                            <span class="text-xs text-gray-400">其他金额 (Amount, Other)</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('9F1A')">
+                            <span class="mono-font text-blue-400 text-sm">9F1A</span>
+                            <span class="text-xs text-gray-400">国家代码 (Country Code)</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('5F2A')">
+                            <span class="mono-font text-blue-400 text-sm">5F2A</span>
+                            <span class="text-xs text-gray-400">交易货币代码 (Transaction Currency Code)</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('9A')">
+                            <span class="mono-font text-blue-400 text-sm">9A</span>
+                            <span class="text-xs text-gray-400">交易日期 (Transaction Date)</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('9C')">
+                            <span class="mono-font text-blue-400 text-sm">9C</span>
+                            <span class="text-xs text-gray-400">交易类型 (Transaction Type)</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('5F34')">
+                            <span class="mono-font text-blue-400 text-sm">5F34</span>
+                            <span class="text-xs text-gray-400">应用 PAN 序列号 (Application PAN Sequence Number)</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 px-3 bg-gray-900/30 rounded hover:bg-gray-900/50 transition cursor-pointer" onclick="insertTag('9F33')">
+                            <span class="mono-font text-blue-400 text-sm">9F33</span>
+                            <span class="text-xs text-gray-400">终端能力 (Terminal Capabilities)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Output Section -->
+            <div class="space-y-6">
+                <!-- Parsed Result Card -->
+                <div class="glass-effect rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold flex items-center">
+                            <i class="fas fa-code-branch text-green-400 mr-2"></i>
+                            解析结果
+                        </h2>
+                        <div class="flex space-x-2">
+                            <button onclick="exportJSON()" class="px-3 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 transition">
+                                <i class="fas fa-file-code mr-1"></i>JSON
+                            </button>
+                            <button onclick="copyResult()" class="px-3 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 transition">
+                                <i class="fas fa-copy mr-1"></i>复制
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="parsed-output" class="bg-gray-900/50 rounded-lg p-4 min-h-[400px] max-h-[600px] overflow-y-auto custom-scrollbar">
+                        <div class="text-center text-gray-500 py-20">
+                            <i class="fas fa-inbox text-4xl mb-4 opacity-50"></i>
+                            <p>请输入 TLV 数据并点击解析</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hex View Card -->
+                <div class="glass-effect rounded-xl p-6">
+                    <h2 class="text-lg font-semibold flex items-center mb-4">
+                        <i class="fas fa-terminal text-purple-400 mr-2"></i>
+                        十六进制视图
+                    </h2>
+                    <div id="hex-view" class="bg-gray-900/50 rounded-lg p-4 mono-font text-sm overflow-x-auto custom-scrollbar">
+                        <div class="text-center text-gray-500 py-8">
+                            <p>解析后将显示详细的十六进制视图</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-gray-700 mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="text-sm text-gray-500">
+                    <i class="fas fa-shield-alt mr-2"></i>
+                    所有数据处理均在本地浏览器中完成，不会上传到服务器
+                </div>
+                <div class="flex items-center space-x-4 mt-4 md:mt-0">
+                    <span class="text-xs text-gray-600">支持 EMV / ISO 7816 / BER-TLV 格式</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
